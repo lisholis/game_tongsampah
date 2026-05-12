@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Edukasi: Pilah Sampahmu!</title>
+    <style>
+        /* --- CSS STYLE --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
+            overflow: hidden;
+        }
+
+        .game-container {
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            width: 90%;
+            max-width: 500px;
+        }
+
+        h1 { color: #2e7d32; margin-top: 0; }
+        p { color: #546e7a; font-size: 0.9rem; }
+
+        .score-board {
+            background: #f1f8e9;
+            padding: 10px;
+            border-radius: 15px;
+            margin: 15px 0;
+            border: 2px solid #c5e1a5;
+        }
+
+        .score-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #388e3c;
+        }
+
+        #item-container {
+            height: 140px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+            background: #fafafa;
+            border-radius: 15px;
+            border: 2px inset #eee;
+        }
+
+        #trash-item {
+            padding: 15px 25px;
+            background: #ffffff;
+            border: 3px dashed #81c784;
+            border-radius: 12px;
+            cursor: grab;
+            font-weight: bold;
+            font-size: 1.3rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+            user-select: none;
+        }
+
+        #trash-item:active { cursor: grabbing; transform: scale(1.1); }
+
+        .bins-container {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .bin {
+            width: 130px;
+            height: 170px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .organik { background-color: #4caf50; border: 5px solid #2e7d32; }
+        .anorganik { background-color: #f44336; border: 5px solid #c62828; }
+
+        .bin:hover { transform: translateY(-10px); }
+
+        .bin-icon { font-size: 50px; margin-bottom: 10px; }
+
+        .btn-reset {
+            padding: 12px 30px;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn-reset:hover { background-color: #1565c0; }
+
+        /* Pop-up Emoticon */
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            z-index: 1000;
+            pointer-events: none;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .popup.show { transform: translate(-50%, -50%) scale(2); }
+        .emoticon { font-size: 100px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3)); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>Pilah Sampah!</h1>
+        <p>Tarik sampah ke tempat yang benar</p>
+        
+        <div class="score-board">
+            Skor: <span id="score" class="score-value">0</span>
+        </div>
+
+        <div id="item-container">
+            <div id="trash-item" draggable="true">Memuat...</div>
+        </div>
+
+        <div class="bins-container">
+            <div class="bin organik" id="organik" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <div class="bin-icon">🌿</div>
+                <div class="label">ORGANIK</div>
+            </div>
+            <div class="bin anorganik" id="anorganik" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <div class="bin-icon">♻️</div>
+                <div class="label">ANORGANIK</div>
+            </div>
+        </div>
+        
+        <button onclick="resetGame()" class="btn-reset">Main Lagi</button>
+    </div>
+
+    <div id="feedback-popup" class="popup hidden">
+        <div id="emoticon" class="emoticon"></div>
+    </div>
+
+    <script>
+        /* --- JAVASCRIPT LOGIC --- */
+        const trashData = [
+            { name: "🍎 Sisa Apel", type: "organik" },
+            { name: "🍂 Daun Kering", type: "organik" },
+            { name: "🍌 Kulit Pisang", type: "organik" },
+            { name: "🦴 Tulang Ikan", type: "organik" },
+            { name: "🥤 Botol Plastik", type: "anorganik" },
+            { name: "🥫 Kaleng Soda", type: "anorganik" },
+            { name: "🛍️ Plastik Kresek", type: "anorganik" },
+            { name: "📺 Elektronik Rusak", type: "anorganik" },
+            { name: "🥛 Gelas Kaca", type: "anorganik" }
+        ];
+
+        let score = 0;
+        let currentItem = {};
+
+        const trashElement = document.getElementById("trash-item");
+        const scoreElement = document.getElementById("score");
+        const popup = document.getElementById("feedback-popup");
+        const emoticonDiv = document.getElementById("emoticon");
+
+        // Web Audio Context untuk suara sintesis
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(isCorrect) {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (isCorrect) {
+                // Suara Berhasil (Nada Tinggi)
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+            } else {
+                // Suara Gagal (Nada Rendah)
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(220, audioCtx.currentTime); // A3
+                oscillator.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.2);
+            }
+
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function spawnTrash() {
+            const randomIndex = Math.floor(Math.random() * trashData.length);
+            currentItem = trashData[randomIndex];
+            trashElement.innerText = currentItem.name;
+        }
+
+        function showFeedback(isCorrect) {
+            emoticonDiv.innerText = isCorrect ? "😊" : "😭";
+            playSound(isCorrect); // Jalankan suara
+            
+            popup.classList.remove("hidden");
+            void popup.offsetWidth; 
+            popup.classList.add("show");
+
+            setTimeout(() => {
+                popup.classList.remove("show");
+                setTimeout(() => {
+                    popup.classList.add("hidden");
+                }, 300);
+            }, 2000);
+        }
+
+        // Drag and Drop Events
+        trashElement.addEventListener("dragstart", (e) => {
+            // Aktifkan AudioContext pada interaksi pertama (kebijakan browser)
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            e.dataTransfer.setData("text", currentItem.type);
+            trashElement.style.opacity = "0.4";
+        });
+
+        trashElement.addEventListener("dragend", () => {
+            trashElement.style.opacity = "1";
+        });
+
+        function allowDrop(e) {
+            e.preventDefault();
+        }
+
+        function drop(e) {
+            e.preventDefault();
+            const droppedType = e.dataTransfer.getData("text");
+            const targetBinType = e.currentTarget.id;
+
+            if (droppedType === targetBinType) {
+                score += 10;
+                showFeedback(true);
+            } else {
+                score -= 5;
+                if (score < 0) score = 0;
+                showFeedback(false);
+            }
+
+            scoreElement.innerText = score;
+            spawnTrash();
+        }
+
+        function resetGame() {
+            score = 0;
+            scoreElement.innerText = score;
+            spawnTrash();
+        }
+
+        spawnTrash();
+    </script>
+</body>
+</html>
